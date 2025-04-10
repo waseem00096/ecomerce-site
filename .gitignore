@@ -82,3 +82,5 @@ terraform/terra-key
 terraform/terraform.tfstate*
 terraform/.terraform.lock.hcl
 terraform/.terraform/modules/*
+
+terraform/.terraform

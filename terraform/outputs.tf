@@ -22,10 +22,8 @@ output "eks_cluster_endpoint" {
   description = "EKS cluster API endpoint"
   value       = module.eks.cluster_endpoint
 }
-output "arn" {
-  value = aws_instance.testinstance.arn
-}
 
-output "public_ip" {
-  value = aws_instance.testinstance.public_ip
+output "public_subnets" {
+  description = "Public subnets used by the EKS cluster"
+  value       = module.vpc.public_subnets
 }
