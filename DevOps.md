@@ -114,98 +114,103 @@ sudo systemctl status jenkins
 ```
 ## Steps to Access Jenkins & Install Plugins
 
-1. **Open Jenkins in Browser:**
-Use your public IP with port 8080:
+#### 1. **Open Jenkins in Browser:**
+> Use your public IP with port 8080:
+>**http://<public_IP>:8080**
 
-**http://<public_IP>:8080**
+#### 2. **Initial Admin password:**
+> Start the service and get the Jenkins initial admin password:
+> ```bash
+> sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+> ```
 
-2. **Initial Admin password:**
-Start the service and get the Jenkins initial admin password:
-```bash
-sudo cat /var/lib/jenkins/secrets/initialAdminPassword
-```
+#### 3. **Start Jenkins (*If Not Running*):**
+> Get the Jenkins initial admin password:
+> ```bash
+> sudo systemctl enable jenkins
+> sudo systemctl restart jenkins
+> ```
+#### 4. **Install Essential Plugins:**
+> - Navigate to:
+> **Manage Jenkins → Plugins → Available Plugins**<br/>
+> - Search and install the following:<br/>
+>   - **Docker Pipeline**<br/>
+>   - **Pipeline View**
 
-3. **Start Jenkins (*If Not Running*):**
-Get the Jenkins initial admin password:
-```bash
-sudo systemctl enable jenkins
-sudo systemctl restart jenkins
-```
-4. **Install Essential Plugins:**
-Navigate to:<br/>
-**Manage Jenkins → Plugins → Available Plugins**<br/>
-Search and install the following:<br/>
-**Docker Pipeline**<br/>
-**Pipeline View**
 
-5. Set Up Docker & GitHub Credentials in Jenkins (Global Credentials)<br/>
-<br/>
-- GitHub Credentials:<br/>
-Go to:<br/>
+#### 5. **Set Up Docker & GitHub Credentials in Jenkins (Global Credentials)**<br/>
+>
+> - GitHub Credentials:
+>   - Go to:
 **Jenkins → Manage Jenkins → Credentials → (Global) → Add Credentials**
-Use:<br/>
-Kind: **Username with password or Personal Access Token**<br/>
-ID: **github-credentials**<br/>
+> - Use:
+>   - Kind: **Username with password**
+>   - ID: **github-credentials**<br/>
 
-- DockerHub Credentials:<br/>
-Go to the same Global Credentials section<br/>
-Use:<br/>
-Kind: **Username with password**<br/>
-ID: **docker-hub-credentials**<br/>
-Use these IDs in your Jenkins pipeline for secure access to GitHub and DockerHub.<br/>
 
-6. Jenkins Shared Library Setup<br/>
-Configure Trusted Pipeline Library:<br/>
-Go to:<br/>
-**Jenkins → Manage Jenkins → Configure System**<br/>
+> - DockerHub Credentials:
+> Go to the same Global Credentials section
+> - Use:
+>   - Kind: **Username with password**
+>   - ID: **docker-hub-credentials**
+> [Notes:]
+> Use these IDs in your Jenkins pipeline for secure access to GitHub and DockerHub
 
-Scroll to Global Pipeline Libraries section<br/>
-
-**Add a New Shared Library:** <br/>
-**Name:** shared<br/>
-**Default Version:** main<br/>
-**Project Repository URL:** `https://github.com/<your user-name/jenkins-shared-libraries`.<br/>
-**Note:** Make sure the repo contains a proper directory structure eq: vars/<br/>
+#### 6. Jenkins Shared Library Setup:
+> - `Configure Trusted Pipeline Library`:
+>   - Go to:
+> **Jenkins → Manage Jenkins → Configure System**
+> Scroll to Global Pipeline Libraries section
+>
+> - **Add a New Shared Library:** 
+> - **Name:** shared
+> - **Default Version:** main
+> - **Project Repository URL:** `https://github.com/<your user-name/jenkins-shared-libraries`.
+>
+> [Notes:] 
+> Make sure the repo contains a proper directory structure eq: vars/<br/>
 	
-7. Setup Pipeline<br/>
-- Create New Pipeline Job<br/>
-  - **Name:** EasyShop<br/>
-  - **Type:** Pipeline<br/>
-  > Press `Okey`<br/>
+#### 7. Setup Pipeline<br/>
+> - Create New Pipeline Job<br/>
+>   - **Name:** EasyShop<br/>
+>   - **Type:** Pipeline<br/>
+> Press `Okey`<br/>
 
-  > In **General**<br/>
-  - **Description:** EasyShop<br/>
-  - **Check the box:** `GitHub project`<br/>
-  - **GitHub Repo URL:** `https://github.com/<your user-name/tws-e-commerce-app`<br/>
-  > In **Trigger**<br/>
-  - **Check the box:**`GitHub hook trigger for GITScm polling`<br/>
-  > In **Pipeline**<br/>
-  - **Definition:** `Pipeline script from SCM`<br/>
-  - **SCM:** `Git`<br/>
-  - **Repository URL:** `https://github.com/<your user-name/tws-e-commerce-app`<br/>
-  - **Credentials:** `github-credentials`<br/>
-  - **Branch:** master<br/>
-  - **Script Path:** `Jenkinsfile`<br/>
+> > In **General**<br/>
+> > - **Description:** EasyShop<br/>
+> > - **Check the box:** `GitHub project`<br/>
+> > - **GitHub Repo URL:** `https://github.com/<your user-name/tws-e-commerce-app`<br/>
+>
+> > In **Trigger**<br/>
+> > - **Check the box:**`GitHub hook trigger for GITScm polling`<br/>
+>
+> > In **Pipeline**<br/>
+> > - **Definition:** `Pipeline script from SCM`<br/>
+> > - **SCM:** `Git`<br/>
+> > - **Repository URL:** `https://github.com/<your user-name/tws-e-commerce-app`<br/>
+> > - **Credentials:** `github-credentials`<br/>
+> > - **Branch:** master<br/>
+> > - **Script Path:** `Jenkinsfile`<br/>
 
-**Fork Required Repos**<br/>
-Fork App Repo:<br/>
-* Open the Jenkinsfile<br/>
-* Change the DockerHub username to yours<br/>
+#### **Fork Required Repos**<br/>
+> > Fork App Repo:<br/>
+> > * Open the `Jenkinsfile`<br/>
+> > * Change the DockerHub username to yours<br/>
+>
+> > **Fork Shared Library Repo:**<br/>
+> > * Edit `vars/update_k8s_manifest.groovy`<br/>
+> > * Update with your `DockerHub username`<br/>
+> 
+> > **Setup Webhook**<br/>
+> > In GitHub:<br/>
+> >  * Go to **`Settings` → `Webhooks`**<br/>
+> >  * Add a new webhook pointing to your Jenkins URL<br/>
+> >  * Select: **`GitHub hook trigger for GITScm polling`** in Jenkins job<br/>
+>
+> > **Trigger the Pipeline**<br/>
+> > Click **`Build Now`** in Jenkins
 
-**Fork Shared Library Repo:**<br/>
-* Edit vars/update_k8s_manifest.groovy<br/>
-* Update with your DockerHub username<br/>
-
-**Setup Webhook**<br/>
-In GitHub:<br/>
-* Go to **Settings → Webhooks**<br/>
-* Add a new webhook pointing to your Jenkins URL<br/>
-* Select: **"GitHub hook trigger for GITScm polling"** in Jenkins job<br/>
-
-**Trigger the Pipeline**<br/>
-Click **'Build Now'** in Jenkins
-
-**7. CD – Continuous Deployment Setup**<br/>
+#### **8. CD – Continuous Deployment Setup**<br/>
 **Prerequisites:**<br/>
 Before configuring CD, make sure the following tools are installed:<br/>
 * Installations Required:<br/>
@@ -284,30 +289,82 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 * On the left panel of Argo CD GUI, click on "User Info"
 * Select Update Password and change it.
 
-**Deploy Your Application in Argo CD GUI**<br/>
-1. On the Argo CD homepage, click on the “New App” button.<br/>
-2. Fill in the following details:<br/>
-* Application Name:<br/>
- [Enter your desired app name]<br/>
+### **Deploy Your Application in Argo CD GUI**<br/>
 
-* **Project Name:** <br/>
- Select 'default' from the dropdown.<br/>
-* **Sync Policy:** <br/>
- Choose 'Automatic'.<br/>
+> 1. On the Argo CD homepage, click on the “New App” button.<br/>
 
-3. In the “Source” section:<br/>
-***Repo URL:** <br/>
- Add the Git repository URL that contains your Kubernetes manifests.<br/>
-***Path:** <br/>
- Kubernetes (or the actual path inside the repo where your manifests reside)<br/>
+> 2. Fill in the following details:<br/>
+>  -  **Application Name:**
+> `Enter your desired app name`
+>  -  **Project Name:**
+> Select `default` from the dropdown.
+>    * **Sync Policy:**
+> Choose `Automatic`.
 
-4. In the “Destination” section:
-* **Cluster URL:** <br/>
+> 3. In the `Source` section:
+> - **Repo URL:**
+> Add the Git repository URL that contains your Kubernetes manifests.
+> - **Path:** 
+ `Kubernetes` (or the actual path inside the repo where your manifests reside)
+
+> 4. In the “Destination” section:
+>  -  **Cluster URL:**
  https://kubernetes.default.svc (usually shown as "default")
-* **Namespace:** <br/>
- tws-e-commerce-app (or your desired namespace)<br/>
+>  -    **Namespace:**
+ tws-e-commerce-app (or your desired namespace)
 
-5. Click on “Create”.
+> 5. Click on “Create”.
 
+## Nginx ingress controller:<br/>
+> 1. Install the Nginx Ingress Controller using Helm:
+```bash
+kubectl create namespace ingress-nginx
+```
+> 2. Add the Nginx Ingress Controller Helm repository:
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+```
+> 3. Install the Nginx Ingress Controller:
+```bash
+helm install nginx-ingress ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx \
+  --set controller.service.type=LoadBalancer
+```
+> 4. Check the status of the Nginx Ingress Controller:
+```bash
+kubectl get pods -n ingress-nginx
+```
+> 5. Get the external IP address of the LoadBalancer service:
+```bash
+kubectl get svc -n ingress-nginx
+```
+
+## Install Cert-Manager
+
+> 1. **Jetpack:** Add the Jetstack Helm repository:
+```bash
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+```
+> 2. **Cert-Manager:** Install the Cert-Manager Helm chart:
+```bash
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --version v1.12.0 \
+  --set installCRDs=true
+``` 
+> 3. **Check pods:**Check the status of the Cert-Manager pods:
+```bash
+kubectl get pods -n cert-manager
+```
+
+> 4. **DNS Setup:** Find your DNS name from the LoadBalancer service:
+```bash
+kubectl get svc nginx-ingress-ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+```
+> 5. Create a DNS record for your domain pointing to the LoadBalancer IP.
+> - Go to your godaddy dashboard and create a new CNAME record and map the DNS just your got in the terminal.
 ## **Congratulations!** <br/>
-### Your project is now deployed via Argo CD 
+### Your project is now deployed.
