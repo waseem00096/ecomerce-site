@@ -366,5 +366,87 @@ kubectl get svc nginx-ingress-ingress-nginx-controller -n ingress-nginx -o jsonp
 ```
 > 5. Create a DNS record for your domain pointing to the LoadBalancer IP.
 > - Go to your godaddy dashboard and create a new CNAME record and map the DNS just your got in the terminal.
+
+
+### **HTTPS:**
+> #### 1. **Update your manifests to enable HTTPS:**
+> > `04-configmap.yaml`
+> > ```bash
+> > apiVersion: v1
+> > kind: ConfigMap
+> > metadata:
+> >   name: easyshop-config
+> >   namespace: easyshop
+> > data:
+> >   MONGODB_URI: "mongodb://mongodb-service:27017/easyshop"
+> >   NODE_ENV: "production"
+> >   NEXT_PUBLIC_API_URL: "https://easyshop.letsdeployit.com/api"
+> >   NEXTAUTH_URL: "https://easyshop.letsdeployit.com/"
+> >   NEXTAUTH_SECRET: "HmaFjYZ2jbUK7Ef+wZrBiJei4ZNGBAJ5IdiOGAyQegw="
+> >   JWT_SECRET: "e5e425764a34a2117ec2028bd53d6f1388e7b90aeae9fa7735f2469ea3a6cc8c"
+> > ```
+
+> #### 2. **Update your manifests to enable HTTPS:**
+> > `10-ingress.yaml`
+> > ```bash
+> > apiVersion: networking.k8s.io/v1
+> > kind: Ingress
+> > metadata:
+> >   name: easyshop-ingress
+> >   namespace: easyshop
+> >   annotations:
+> >     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+> >     kubernetes.io/ingress.class: "nginx"
+> >     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+> >     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+> > spec:
+> >   tls:
+> >   - hosts:
+> >     - easyshop.letsdeployit.com
+> >     secretName: easyshop-tls
+> >   rules:
+> >   - host: easyshop.letsdeployit.com
+> >     http:
+> >       paths:
+> >       - path: /
+> >         pathType: Prefix
+> >         backend:
+> >           service:
+> >             name: easyshop-service
+> >             port:
+> >               number: 80
+> > ```
+
+> #### 3. **Apply your manifests:**
+> ```bash
+> kubectl apply -f 00-cluster-issuer.yaml
+> kubectl apply -f 04-configmap.yaml
+> kubectl apply -f 10-ingress.yaml
+> ```
+
+> #### 4. **Commands to check the status:**
+>
+>> ```bash
+>> kubectl get certificate -n easyshop
+>> ```
+
+>> ```bash
+>> kubectl describe certificate easyshop-tls -n easyshop
+>> ```
+>
+>> ```bash
+>> kubectl logs -n cert-manager -l app=cert-manager
+>> ```
+>
+>> ```bash
+>> kubectl get challenges -n easyshop
+>> ```
+>
+>> ```bash
+>> kubectl describe challenges -n easyshop
+>> ```
+
 ## **Congratulations!** <br/>
+![EasyShop Website Screenshot](./public/Deployed.png)
+
 ### Your project is now deployed.
