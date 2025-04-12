@@ -9,7 +9,7 @@ metadata:
     kubernetes.io/ingress.class: "nginx"
 spec:
   rules:
-  - host: "easyshop.letsdeployit.com"
+  - host: easyshop.letsdeployit.com
     http:
       paths:
       - path: /
