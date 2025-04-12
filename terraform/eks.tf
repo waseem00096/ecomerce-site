@@ -47,6 +47,8 @@ module "eks" {
       use_custom_launch_template = false  # Important to apply disk size!
 
       tags = {
+        Name = "tws-demo-ng"
+        Environment = "dev"
         ExtraTag = "e-commerce-app"
       }
     }
@@ -55,4 +57,17 @@ module "eks" {
   tags = local.tags
 
 
+}
+
+data "aws_instances" "eks_nodes" {
+  instance_tags = {
+    "eks:cluster-name" = module.eks.cluster_name
+  }
+
+  filter {
+    name   = "instance-state-name"
+    values = ["running"]
+  }
+
+  depends_on = [module.eks]
 }
