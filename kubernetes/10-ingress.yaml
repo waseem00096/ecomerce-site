@@ -14,7 +14,7 @@ spec:
     - easyshop.devopsdock.site
     secretName: easyshop-tls-secret  # Cert-Manager will manage this
   rules:
-  - host: easyshop.letsdeployit.com
+  - host: easyshop.devopsdock.site
     http:
       paths:
       - path: /
