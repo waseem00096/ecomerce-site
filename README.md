@@ -78,8 +78,10 @@ sudo apt install unzip
 unzip awscliv2.zip
 sudo ./aws/install
 ```
-
+### 2. Install AWS CLI in Windows 'powershell'
+```msiexec.exe /i https://awscli.amazonaws.com/AWSCLIV2.msi```
  ```aws configure```
+
 
 > #### This will prompt you to enter:<br/>
 - **AWS Access Key ID:**<br/>
