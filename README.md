@@ -209,7 +209,7 @@ sudo systemctl status jenkins
 > Scroll to Global Pipeline Libraries section
 >
 > - **Add a New Shared Library:** 
-> - **Name:** shared
+> - **Name:** Shared
 > - **Default Version:** main
 > - **Project Repository URL:** `https://github.com/<your user-name/jenkins-shared-libraries`.
 >
