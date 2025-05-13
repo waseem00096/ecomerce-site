@@ -13,10 +13,6 @@ metadata:
     alb.ingress.kubernetes.io/ssl-redirect: '443'
     kubernetes.io/ingress.class: alb
 spec:
-  tls:
-  - hosts:
-    - easyshop.devopsdock.site
-    secretName: easyshop-tls-secret  # Cert-Manager will manage this
   rules:
   - host: easyshop.devopsdock.site
     http:
