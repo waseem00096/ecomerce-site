@@ -288,260 +288,430 @@ aws eks update-kubeconfig --region eu-west-1 --name tws-eks-cluster
 * This command maps your EKS cluster with your Bastion server.
 * It helps to communicate with EKS components.
 
-**10. Argo CD Setup**<br/>
+**10. Install AWS application load balancer refering the below docs link**<br/>
+```
+https://docs.aws.amazon.com/eks/latest/userguide/lbc-helm.html
+```
+**11. Install the EBS CSI driver refering the below docs link**<br/>
+```
+https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html#eksctl_store_app_data
+```
+
+
+**12. Argo CD Setup**<br/>
 Create a Namespace for Argo CD<br/>
 ```bash
 kubectl create namespace argocd
 ```
-1. Install Argo CD using Manifest
+1. Install Argo CD using helm  
+(https://artifacthub.io/packages/helm/argo/argo-cd)
 ```bash
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+helm repo add argo https://argoproj.github.io/argo-helm
+helm install my-argo-cd argo/argo-cd --version 8.0.10
 ```
-2. Watch Pod Creation
+2. get the values file and save it
 ```bash
-watch kubectl get pods -n argocd
+helm show values argo/argo-cd > argocd-values.yaml
 ```
-3. This helps monitor when all Argo CD pods are up and running.<br/>
-
-4. Check Argo CD Services
-```bash
-kubectl get svc -n argocd
+3. edit the values file, change the below settings.
 ```
+global:
+  domain: argocd.example.com
 
-5. Change Argo CD Server Service to NodePort
-```bash
-kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "NodePort"}}'
+configs:
+  params:
+    server.insecure: true
+
+server:
+  ingress:
+    enabled: true
+    controller: aws
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/certificate-arn: <your-cert-arn>
+      alb.ingress.kubernetes.io/group.name: easyshop-app-lb
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/backend-protocol: HTTP
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: '443'
+    hostname: argocd.devopsdock.site
+    aws:
+      serviceType: ClusterIP # <- Used with target-type: ip
+      backendProtocolVersion: GRPC
 ```
-
-11. Access Argo CD GUI<br/>
-Check Argo CD Server Port (again, post NodePort change)<br/>
-```bash
-kubectl get svc -n argocd
+4. save and upgrade the helm chart.
 ```
-1. Port Forward to Access Argo CD in Browser<br/>
- Forward Argo CD service to access the GUI:
-```bash
-kubectl port-forward svc/argocd-server -n argocd <your-port>:443 --address=0.0.0.0 &
+helm upgrade my-argo-cd argo/argo-cd -n argocd -f my-values.yaml
 ```
-2. Replace <your-port> with a local port of your choice (e.g., 8080).<br/>
- Now, open https://<bastion-ip>:<your-port> in your browser.
+5. add the record in route53 “argocd.devopsdock.site” with load balancer dns.
 
+6. access it in browser.
 
-Get the Argo CD Admin Password<br/>
-```bash
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d; echo
-```
-1. Log in to the Argo CD GUI
-* Username: admin
-* Password: (Use the decoded password from the previous command)
+7. Retrive the secret for Argocd
 
-2. Update Your Password
-* On the left panel of Argo CD GUI, click on "User Info"
-* Select Update Password and change it.
-
-### **Deploy Your Application in Argo CD GUI**<br/>
-
-> 1. On the Argo CD homepage, click on the “New App” button.<br/>
-
-> 2. Fill in the following details:<br/>
->  -  **Application Name:**
-> `Enter your desired app name`
->  -  **Project Name:**
-> Select `default` from the dropdown.
->    * **Sync Policy:**
-> Choose `Automatic`.
-
-> 3. In the `Source` section:
-> - **Repo URL:**
-> Add the Git repository URL that contains your Kubernetes manifests.
-> - **Path:** 
- `Kubernetes` (or the actual path inside the repo where your manifests reside)
-
-> 4. In the “Destination” section:
->  -  **Cluster URL:**
- https://kubernetes.default.svc (usually shown as "default")
->  -    **Namespace:**
- tws-e-commerce-app (or your desired namespace)
-
-> 5. Click on “Create”.
-
-## Nginx ingress controller:<br/>
-> 1. Install the Nginx Ingress Controller using Helm:
-```bash
-kubectl create namespace ingress-nginx
-```
-> 2. Add the Nginx Ingress Controller Helm repository:
-```bash
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-```
-> 3. Install the Nginx Ingress Controller:
-```bash
-helm install nginx-ingress ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx \
-  --set controller.service.type=LoadBalancer
-```
-> 4. Check the status of the Nginx Ingress Controller:
-```bash
-kubectl get pods -n ingress-nginx
-```
-> 5. Get the external IP address of the LoadBalancer service:
-```bash
-kubectl get svc -n ingress-nginx
+```jsx
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```
 
-## Install Cert-Manager
+8. login to argocd “admin” and retrieved password
 
-> 1. **Jetpack:** Add the Jetstack Helm repository:
-```bash
-helm repo add jetstack https://charts.jetstack.io
-helm repo update
-```
-> 2. **Cert-Manager:** Install the Cert-Manager Helm chart:
-```bash
-helm install cert-manager jetstack/cert-manager \
-  --namespace cert-manager \
-  --create-namespace \
-  --version v1.12.0 \
-  --set installCRDs=true
-``` 
-> 3. **Check pods:**Check the status of the Cert-Manager pods:
-```bash
-kubectl get pods -n cert-manager
-```
+9. Change the password by going to “user info” tab in the UI.
 
-> 4. **DNS Setup:** Find your DNS name from the LoadBalancer service:
-```bash
-kubectl get svc nginx-ingress-ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-```
-> 5. Create a DNS record for your domain pointing to the LoadBalancer IP.
-> - Go to your godaddy dashboard and create a new CNAME record and map the DNS just your got in the terminal.
+**Deploy Your Application in Argo CD GUI**
 
+> On the Argo CD homepage, click on the “New App” button.
+> 
 
-### **HTTPS:**
-> #### 1. **Update your manifests to enable HTTPS:**
-> > `04-configmap.yaml`
-> > ```bash
-> > apiVersion: v1
-> > kind: ConfigMap
-> > metadata:
-> >   name: easyshop-config
-> >   namespace: easyshop
-> > data:
-> >   MONGODB_URI: "mongodb://mongodb-service:27017/easyshop"
-> >   NODE_ENV: "production"
-> >   NEXT_PUBLIC_API_URL: "https://easyshop.letsdeployit.com/api"
-> >   NEXTAUTH_URL: "https://easyshop.letsdeployit.com/"
-> >   NEXTAUTH_SECRET: "HmaFjYZ2jbUK7Ef+wZrBiJei4ZNGBAJ5IdiOGAyQegw="
-> >   JWT_SECRET: "e5e425764a34a2117ec2028bd53d6f1388e7b90aeae9fa7735f2469ea3a6cc8c"
-> > ```
+> Fill in the following details:
+> 
+> - **Application Name:** `Enter your desired app name`
+> - **Project Name:** Select `default` from the dropdown.
+> - **Sync Policy:** Choose `Automatic`.
 
-> #### 2. **Update your manifests to enable HTTPS:**
-> > `10-ingress.yaml`
-> > ```bash
-> > apiVersion: networking.k8s.io/v1
-> > kind: Ingress
-> > metadata:
-> >   name: easyshop-ingress
-> >   namespace: easyshop
-> >   annotations:
-> >     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-> >     kubernetes.io/ingress.class: "nginx"
-> >     cert-manager.io/cluster-issuer: "letsencrypt-prod"
-> >     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-> > spec:
-> >   tls:
-> >   - hosts:
-> >     - easyshop.letsdeployit.com
-> >     secretName: easyshop-tls
-> >   rules:
-> >   - host: easyshop.letsdeployit.com
-> >     http:
-> >       paths:
-> >       - path: /
-> >         pathType: Prefix
-> >         backend:
-> >           service:
-> >             name: easyshop-service
-> >             port:
-> >               number: 80
-> > ```
+> In the Source section:
+> 
+> - **Repo URL:** Add the Git repository URL that contains your Kubernetes manifests.
+> - **Path:** `Kubernetes` (or the actual path inside the repo where your manifests reside)
 
-> #### 3. **Apply your manifests:**
-> ```bash
-> kubectl apply -f 00-cluster-issuer.yaml
-> kubectl apply -f 04-configmap.yaml
-> kubectl apply -f 10-ingress.yaml
-> ```
+> In the “Destination” section:
+> 
+> - **Cluster URL:** [https://kubernetes.default.svc](https://kubernetes.default.svc/) (usually shown as "default")
+> - **Namespace:** tws-e-commerce-app (or your desired namespace)
 
-> #### 4. **Commands to check the status:**
->
->> ```bash
->> kubectl get certificate -n easyshop
->> ```
+> Click on “Create”.
+> 
 
->> ```bash
->> kubectl describe certificate easyshop-tls -n easyshop
->> ```
->
->> ```bash
->> kubectl logs -n cert-manager -l app=cert-manager
->> ```
->
->> ```bash
->> kubectl get challenges -n easyshop
->> ```
->
->> ```bash
->> kubectl describe challenges -n easyshop
->> ```
+NOTE: before deploying Chnage your ingress settings and image tag in the yamls inside “kubernetes” directory
 
-### **Install Metric Server:**
-> 1. **install thru manifest:** :
-```bash
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-```
->2. **check the pods:** :
-```bash
-kubectl get deployment metrics-server -n kube-system
-```
-### **Enable Monitoring with Kube-prometheus-stack:**
-> 1. **Add the repo:** :
-```bash
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-```
-> 2. **Install the chart:** :
-```bash
-helm install my-kube-prometheus-stack oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack --version 70.7.0
-```
-> 3. **check the services:** :
-```bash
-kubectl get svc
+Ingress Annotations: 
+
+```jsx
+annotations:
+    alb.ingress.kubernetes.io/group.name: easyshop-app-lb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:876997124628:certificate/b69bb6e7-cbd1-490b-b765-27574080f48c
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    kubernetes.io/ingress.class: alb
 ```
 
-> 4. **Edit the Grafana service:** :
-```bash
-kubectl edit svc <your-grafana-svc>
+- **add record to route 53 “easyshop.devopsdock.site”**
+
+- **Access your site now.**
+
+### Install Metric Server
+
+- metric server install thru helm chart
 ```
-> 5. **edit the "type":** :
-```bash
- NodePort
+https://artifacthub.io/packages/helm/metrics-server/metrics-server
 ```
-> 6. **Check the service to see the nodeport:** :
-```bash
- kubectl get svc
+verify metric server.
 ```
-> 7 . **Copy your EKS node's public IP and paste it in the browser with the port:** :
-```bash
-<node-ip>:port_number
+kubectl get pods -w
+kubectl top pods
 ```
-> 8. **You should see the Grafana login page:** :
-```bash
-user: admin
-password: prom-operator
+### Monitoring Using kube-prometheus-stack
+
+create a namespace “monitoring”
+
+```jsx
+kubectl create ns monitoring
 ```
+```
+https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
+```
+verify deployment :
+
+```jsx
+kubectl get pods -n monitoring
+```
+
+get the helm values and save it in a file
+
+```jsx
+helm show values prometheus-community/kube-prometheus-stack > kube-prom-stack.yaml 
+```
+
+edit the file and add the following in the params for prometheus, grafana and alert manger.
+
+**Grafana:**
+
+```jsx
+ingressClassName: alb
+annotations:
+      alb.ingress.kubernetes.io/group.name: easyshop-app-lb
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:876997124628:certificate/b69bb6e7-cbd1-490b-b765-27574080f48c
+      alb.ingress.kubernetes.io/target-type: ip
+			alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: '443'
+ 
+    hosts:
+      - grafana.devopsdock.site
+```
+
+**Prometheus:** 
+
+```jsx
+ingressClassName: alb
+annotations:
+      alb.ingress.kubernetes.io/group.name: easyshop-app-lb
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:876997124628:certificate/b69bb6e7-cbd1-490b-b765-27574080f48c
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: '443'
+    labels: {}
+
+    
+  
+    hosts: 
+      - prometheus.devopsdock.site
+        paths:
+        - /
+        pathType: Prefix
+```
+**Alertmanger:**
+```jsx
+ingressClassName: alb
+annotations:
+      alb.ingress.kubernetes.io/group.name: easyshop-app-lb
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/backend-protocol: HTTP
+			alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
+      alb.ingress.kubernetes.io/ssl-redirect: '443'
+    
+    hosts: 
+      - alertmanager.devopsdock.site
+    paths:
+    - /
+    pathType: Prefix
+```
+
+**Alerting to Slack** 
+
+Create a new workspace in slack, create a new channel e.g. “#alerts”
+
+go to https://api.slack.com/apps to create the webhook.
+
+1. create an app “alertmanager”
+2. go to incoming webhook
+3. create a webhook and copy it.
+
+modify the helm values.
+
+```jsx
+config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'slack-notification'
+      routes:
+      - receiver: 'slack-notification'
+        matchers:
+          - severity = "critical"
+    receivers:
+    - name: 'slack-notification'
+      slack_configs:
+          - api_url: 'REMOVED_SLACK_WEBHOOK
+            channel: '#alerts'
+            send_resolved: true
+    templates:
+    - '/etc/alertmanager/config/*.tmpl'
+```
+
+Note: you can refer this DOCs for the slack configuration. “https://prometheus.io/docs/alerting/latest/configuration/#slack_config” 
+
+upgrade the chart
+
+```jsx
+helm upgrade my-kube-prometheus-stack prometheus-community/kube-prometheus-stack -f kube-prom-stack.yaml -n monitoring
+```
+
+get grafana secret “user = admin”
+
+```jsx
+kubectl --namespace monitoring get secrets my-kube-prometheus-stack-grafana -o jsonpath="{.data.admin-password}" | base64 -d ; echo
+```
+
+You would get the notification in the slack’s respective channel.
+
+## **Logging**
+- we will use elasticsearch for logsstore, filebeat for log shipping and kibana for the visualization. 
+```
+NOTE: The EBS driver we installed is for elasticsearch to dynamically provision an EBS volume.
+```
+**Install Elastic Search:**
+
+```jsx
+helm repo add elastic https://helm.elastic.co -n logging
+helm install my-elasticsearch elastic/elasticsearch --version 8.5.1 -n logging
+```
+
+Create a storageclass so that elastic search can dynamically provision volume in AWS.
+
+storageclass.yaml
+
+```jsx
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ebs-aws
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+```
+
+apply the yaml file.
+
+get the values for elastic search helm chart.
+
+```jsx
+helm show values elastic/elasticsearch > elasticsearch.yaml 
+```
+
+update the values
+
+```jsx
+replicas: 1
+minimumMasterNodes: 1
+clusterHealthCheckParams: "wait_for_status=yellow&timeout=1s"
+```
+
+upgrade the chart
+
+```jsx
+helm upgrade my-elasticsearch elastic/elasticsearch -f elasticsearch.yaml -n logging
+```
+
+if upgarde doesnt happen then uninstall and install it again.
+
+make sure the pod is running .
+
+```jsx
+kubectl get po -n logging
+NAME                     READY   STATUS    RESTARTS   AGE
+elastic-operator-0       1/1     Running   0          6h33m
+elasticsearch-master-0   1/1     Running   0          87m
+```
+
+**FileBeat:**
+
+install filebeat for log shipping.
+
+```jsx
+helm repo add elastic https://helm.elastic.co
+helm install my-filebeat elastic/filebeat --version 8.5.1 -n logging
+```
+
+get the values
+
+```jsx
+helm show values elastic/filebeat > filebeat.yaml 
+```
+
+Filebeat runs as a daemonset. check if its up.
+
+```jsx
+kubectl get po -n logging
+NAME                         READY   STATUS    RESTARTS   AGE
+elastic-operator-0           1/1     Running   0          6h38m
+elasticsearch-master-0       1/1     Running   0          93m
+my-filebeat-filebeat-g79qs   1/1     Running   0          25s
+my-filebeat-filebeat-kh8mj   1/1     Running   0          25s
+```
+
+**Install Kibana:**
+
+install kibana through helm.
+
+```jsx
+helm repo add elastic https://helm.elastic.co
+helm install my-kibana elastic/kibana --version 8.5.1 -n logging
+```
+
+Verify if it runs.
+
+```jsx
+k get po -n logging
+NAME                               READY   STATUS    RESTARTS       AGE
+elastic-operator-0                 1/1     Running   0              8h
+elasticsearch-master-0             1/1     Running   0              3h50m
+my-filebeat-filebeat-g79qs         1/1     Running   0              138m
+my-filebeat-filebeat-jz42x         1/1     Running   0              108m
+my-filebeat-filebeat-kh8mj         1/1     Running   1 (137m ago)   138m
+my-kibana-kibana-559f75574-9s4xk   1/1     Running   0              130m
+```
+
+get values
+
+```jsx
+helm show values elastic/kibana > kibana.yaml 
+```
+
+modify the values for ingress settings
+
+```jsx
+ingress:
+  enabled: true
+  className: "alb"
+  pathtype: Prefix
+  annotations:
+    alb.ingress.kubernetes.io/group.name: easyshop-app-lb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:876997124628:certificate/b69bb6e7-cbd1-490b-b765-27574080f48c
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+  # kubernetes.io/ingress.class: nginx
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: logs-kibana.devopsdock.site
+      paths:
+        - path: /
+```
+
+save the file and exit. upgrade the helm chart using the values file.
+
+```jsx
+helm upgrade my-kibana elastic/kibana -f kibana.yaml -n logging
+```
+
+add all the records to route 53 and give the value as load balancer DNS name. and try to access one by one. 
+
+retrive the secret of elastic search as kibana’s password, username is “elastic”
+
+```jsx
+kubectl get secrets --namespace=logging elasticsearch-master-credentials -ojsonpath='{.data.password}' | base64 -d
+```
+
+### **Filebeat Configuration to ship the "easyshop" app logs to elasticsearch**
+
+configure filebeat to ship the application logs to view in kibana
+
+```jsx
+filebeatConfig:
+    filebeat.yml: |
+      filebeat.inputs:
+      - type: container
+        paths:
+          - /var/log/containers/*easyshop*.log
+```
+
+upgrade filebeat helm chart and check in kibana’s UI if the app logs are streaming.
+
 ## **Congratulations!** <br/>
 ![EasyShop Website Screenshot](./public/Deployed.png)
 
-### Your project is now deployed.
+### WO! ooo!!! ...Your project is now deployed.
