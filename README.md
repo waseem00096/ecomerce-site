@@ -712,6 +712,6 @@ filebeatConfig:
 upgrade filebeat helm chart and check in kibana’s UI if the app logs are streaming.
 
 ## **Congratulations!** <br/>
-![EasyShop Website Screenshot](./public/diagram-export-6-12-2025-1_16_00-AM.PNG)
+![EasyShop Website Screenshot](./public/alertManager.JPG)
 
 ### WO! ooo!!! ...Your project is now deployed.
