@@ -67,7 +67,7 @@ pipeline {
                 script {
                     sh '''
                     export KUBECONFIG=/var/lib/jenkins/.kube/config
-                    kubectl apply -f Kubernetes/manifest.yml
+                    kubectl apply -f kubernetes/manifest.yml
                     kubectl rollout status deployment/ecomerce-site
                     '''
                 }
