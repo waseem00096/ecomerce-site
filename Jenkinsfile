@@ -1,124 +1,81 @@
-
-
 pipeline {
     agent any
-    
-    environment {
-        // Update the main app image name to match the deployment file
-        DOCKER_IMAGE_NAME = 'laxg66/easyshop-app'
-        DOCKER_MIGRATION_IMAGE_NAME = 'laxg66/easyshop-migration'
-        DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
-        GITHUB_CREDENTIALS = credentials('github-credentials')
-        GIT_BRANCH = "master"
+    tools {
+        jdk 'jdk-21'
+        nodejs 'node'
     }
-    
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+    }
     stages {
-        stage('Cleanup Workspace') {
+        stage('Clean Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+        stage('Checkout from Git') {
+            steps {
+                git branch: 'main', url: 'https://github.com/waseem00096/ecomerce-site.git'
+            }
+        }
+        stage("Sonarqube Analysis") {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName= ecomerce-site/
+                    -Dsonar.projectKey=ecomerce-site'''
+                }
+            }
+        }
+        stage("Quality Gate") {
             steps {
                 script {
-                    clean_ws()
+                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token' 
                 }
+            } 
+        }
+        stage('Install Dependencies') {
+            steps {
+                sh "npm install --legacy-peer-deps"
+            }
+        }        
+        stage('TRIVY FS SCAN') {
+            steps {
+                sh "trivy fs . > trivyfs.txt"
             }
         }
-        
-        stage('Clone Repository') {
+        stage("Docker Build & Push") {
             steps {
                 script {
-                    clone("https://github.com/lax66/tws-e-commerce-app_hackathon.git","master")
-                }
-            }
-        }
-        
-        stage('Build Docker Images') {
-            parallel {
-                stage('Build Main App Image') {
-                    steps {
-                        script {
-                            docker_build(
-                                imageName: env.DOCKER_IMAGE_NAME,
-                                imageTag: env.DOCKER_IMAGE_TAG,
-                                dockerfile: 'Dockerfile',
-                                context: '.'
-                            )
-                        }
-                    }
-                }
-                
-                stage('Build Migration Image') {
-                    steps {
-                        script {
-                            docker_build(
-                                imageName: env.DOCKER_MIGRATION_IMAGE_NAME,
-                                imageTag: env.DOCKER_IMAGE_TAG,
-                                dockerfile: 'scripts/Dockerfile.migration',
-                                context: '.'
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Run Unit Tests') {
-            steps {
-                script {
-                    run_tests()
-                }
-            }
-        }
-        
-        stage('Security Scan with Trivy') {
-            steps {
-                script {
-                    // Create directory for results
-                  
-                    trivy_scan()
-                    
-                }
-            }
-        }
-        
-        stage('Push Docker Images') {
-            parallel {
-                stage('Push Main App Image') {
-                    steps {
-                        script {
-                            docker_push(
-                                imageName: env.DOCKER_IMAGE_NAME,
-                                imageTag: env.DOCKER_IMAGE_TAG,
-                                credentials: 'docker-hub-credentials'
-                            )
-                        }
-                    }
-                }
-                
-                stage('Push Migration Image') {
-                    steps {
-                        script {
-                            docker_push(
-                                imageName: env.DOCKER_MIGRATION_IMAGE_NAME,
-                                imageTag: env.DOCKER_IMAGE_TAG,
-                                credentials: 'docker-hub-credentials'
-                            )
-                        }
+                   withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {   
+                       // API key is correctly injected here
+                       sh "docker build --build-arg TMDB_V3_API_KEY=0241f339597a981eef7440309193c7c5 -t waseem09/ecomerce-site:latest ."
+                       sh "docker push waseem09/netflix-clone:latest"
                     }
                 }
             }
         }
-        
-        // Add this new stage
-        stage('Update Kubernetes Manifests') {
+        stage("TRIVY Image Scan") {
+            steps {
+                sh "trivy image waseem09/ecomerce-site:latest > trivyimage.txt" 
+            }
+        }
+        stage('Deploy to Kubernetes') {
             steps {
                 script {
-                    update_k8s_manifests(
-                        imageTag: env.DOCKER_IMAGE_TAG,
-                        manifestsPath: 'kubernetes',
-                        gitCredentials: 'github-credentials',
-                        gitUserName: 'Jenkins CI',
-                        gitUserEmail: 'misc.lucky66@gmail.com'
-                    )
+                    sh '''
+                    export KUBECONFIG=/var/lib/jenkins/.kube/config
+                    # Ensure the case matches your folder (Kubernetes vs kubernetes)
+                    kubectl apply -f Kubernetes/manifest.yml
+                    kubectl rollout status deployment/ecomerce-site
+                    '''
                 }
             }
+        }
+    } // End of Stages
+    post {
+        always {
+            // Reclaims space on your 3.3Gi RAM server
+            sh 'docker image prune -f'
         }
     }
 }
