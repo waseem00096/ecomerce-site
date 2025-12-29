@@ -15,14 +15,17 @@ pipeline {
         }
         stage('Checkout from Git') {
             steps {
+                // Fixed: Explicitly using master as confirmed in your logs
                 git branch: 'master', url: 'https://github.com/waseem00096/ecomerce-site.git'
             }
         }
         stage("Sonarqube Analysis") {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh '''$SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName= ecomerce-site/
-                    -Dsonar.projectKey=ecomerce-site'''
+                    // Fixed: Removed the space after -Dsonar.projectName=
+                    // Added backslash for multi-line shell command
+                    sh "${SCANNER_HOME}/bin/sonar-scanner -Dsonar.projectName=ecomerce-site \
+                    -Dsonar.projectKey=ecomerce-site"
                 }
             }
         }
@@ -47,9 +50,9 @@ pipeline {
             steps {
                 script {
                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {   
-                       // API key is correctly injected here
+                       // Fixed: Build and Push now use the same image name (ecomerce-site)
                        sh "docker build --build-arg TMDB_V3_API_KEY=0241f339597a981eef7440309193c7c5 -t waseem09/ecomerce-site:latest ."
-                       sh "docker push waseem09/netflix-clone:latest"
+                       sh "docker push waseem09/ecomerce-site:latest"
                     }
                 }
             }
@@ -64,17 +67,16 @@ pipeline {
                 script {
                     sh '''
                     export KUBECONFIG=/var/lib/jenkins/.kube/config
-                    # Ensure the case matches your folder (Kubernetes vs kubernetes)
                     kubectl apply -f Kubernetes/manifest.yml
                     kubectl rollout status deployment/ecomerce-site
                     '''
                 }
             }
         }
-    } // End of Stages
+    }
     post {
         always {
-            // Reclaims space on your 3.3Gi RAM server
+            // Efficiency: Reclaims space on your Jenkins VM
             sh 'docker image prune -f'
         }
     }
