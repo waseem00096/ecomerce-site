@@ -68,8 +68,7 @@ pipeline {
                     sh '''
                     export KUBECONFIG=/var/lib/jenkins/.kube/config
                     kubectl apply -f kubernetes/manifest.yml
-                    kubectl rollout status deployment/ecomerce-site
-                    '''
+                    kubectl rollout status deployment/ecomerce-deployment                    '''
                 }
             }
         }
