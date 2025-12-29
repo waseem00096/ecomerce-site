@@ -15,7 +15,7 @@ pipeline {
         }
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: 'https://github.com/waseem00096/ecomerce-site.git'
+                git branch: 'master', url: 'https://github.com/waseem00096/ecomerce-site.git'
             }
         }
         stage("Sonarqube Analysis") {
