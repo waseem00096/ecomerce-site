@@ -51,7 +51,7 @@ pipeline {
                 script {
                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {   
                        // Fixed: Build and Push now use the same image name (ecomerce-site)
-                       sh "docker build --build-arg TMDB_V3_API_KEY=0241f339597a981eef7440309193c7c5 -t waseem09/ecomerce-site:latest ."
+                       sh "docker build -t waseem09/ecomerce-site:latest ."
                        sh "docker push waseem09/ecomerce-site:latest"
                     }
                 }
