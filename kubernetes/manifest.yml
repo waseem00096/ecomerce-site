@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: ecomerce-app
-        image: waseem09/ecomerce-clone:latest 
+        image: waseem09/ecomerce-site:latest 
         imagePullPolicy: Always 
         ports:
         - containerPort: 80
