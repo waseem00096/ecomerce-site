@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: ecomerce-rollout
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ecomerce-app
+  template:
+    metadata:
+      labels:
+        app: ecomerce-app
+    spec:
+      containers:
+      - name: ecomerce-app
+        image: waseem09/ecomerce-site:30 # Jenkins will update this
+        ports:
+        - containerPort: 3000
+  strategy:
+    blueGreen: 
+      # The service that currently serves traffic
+      activeService: ecomerce-service
+      # Argo will automatically promote to active if tests pass
+      autoPromotionEnabled: true 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ecomerce-service
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 3000
+    nodePort: 30008
+  selector:
+    app: ecomerce-app
+    # Note: No 'version' label needed here! Argo handles the mapping.
