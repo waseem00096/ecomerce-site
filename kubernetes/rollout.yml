@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: ecomerce-app
-        image: waseem09/ecomerce-site:50
+        image: waseem09/ecomerce-site:51
         ports:
         - containerPort: 3000
   strategy:
