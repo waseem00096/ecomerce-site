@@ -63,26 +63,28 @@ pipeline {
                 sh "trivy image ${IMAGE_NAME}:latest > trivyimage.txt" 
             }
         }
-        stage('Update Git Manifest') {
-            steps {
-                script {
-                    // Update the kubernetes/manifest.yml with the new image tag
-                    withCredentials([usernamePassword(credentialsId: 'github-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
-                        sh """
-                        git config user.email "jenkins@example.com"
-                        git config user.name "Jenkins-CI"
-                        
-                        # Replace the image tag with the specific build number
-                        sed -i 's|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${BUILD_NUMBER}|g' kubernetes/manifest.yml
-                        
-                        git add kubernetes/manifest.yml
-                        git commit -m "Update image tag to ${BUILD_NUMBER} [skip ci]"
-                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/waseem00096/ecomerce-site.git master
-                        """
-                    }
-                }
+        stage('ArgoCD Deploy') {
+    steps {
+        script {
+            withCredentials([usernamePassword(credentialsId: 'github-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+                sh '''
+                    git config user.email "jenkins@example.com"
+                    git config user.name "Jenkins-CI"
+
+                    git pull origin master --rebase || echo "No remote changes"
+
+                    sed -i "s|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${BUILD_NUMBER}|g" kubernetes/manifest.yml
+
+                    git add kubernetes/manifest.yml
+                    git commit -m "Update image tag to ${BUILD_NUMBER} [skip ci]" || echo "No changes to commit"
+
+                    git push https://$GIT_USERNAME:$GIT_PASSWORD@github.com/waseem00096/ecomerce-site.git master
+                '''
             }
         }
+    }
+}
+
     }
     post {
         always {
