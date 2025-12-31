@@ -68,16 +68,25 @@ pipeline {
         script {
             withCredentials([usernamePassword(credentialsId: 'github-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
                 sh '''
+                    # 1. Setup identity
                     git config user.email "jenkins@example.com"
                     git config user.name "Jenkins-CI"
-                    git pull origin master --rebase
 
-                    # Update the image in the Rollout manifest
+                    # 2. Sync with remote BEFORE making changes
+                    git fetch origin master
+                    git reset --hard origin/master
+
+                    # 3. Now make the change to the manifest
                     sed -i "s|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${BUILD_NUMBER}|g" kubernetes/rollout.yml
 
+                    # 4. Commit and Push
                     git add kubernetes/rollout.yml
-                    git commit -m "Rollout version ${BUILD_NUMBER} [skip ci]" || echo "No changes"
-                    git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/waseem00096/ecomerce-site.git master
+                    if ! git diff-index --quiet HEAD; then
+                        git commit -m "Rollout version ${BUILD_NUMBER} [skip ci]"
+                        git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/waseem00096/ecomerce-site.git master
+                    else
+                        echo "No changes detected. Skipping push."
+                    fi
                 '''
             }
         }
