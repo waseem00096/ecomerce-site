@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: ecomerce-app
-        image: waseem09/ecomerce-site:30 # Jenkins will update this
+        image: waseem09/ecomerce-site:40
         ports:
         - containerPort: 3000
   strategy:
