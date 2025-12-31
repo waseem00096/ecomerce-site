@@ -63,28 +63,48 @@ pipeline {
                 sh "trivy image ${IMAGE_NAME}:latest > trivyimage.txt" 
             }
         }
-        stage('ArgoCD Deploy') {
+      stage('Blue-Green Deploy') {
     steps {
         script {
             withCredentials([usernamePassword(credentialsId: 'github-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
                 sh '''
                     git config user.email "jenkins@example.com"
                     git config user.name "Jenkins-CI"
+                    git pull origin master --rebase
 
-                    git pull origin master --rebase || echo "No remote changes"
+                    # 1. Check which version is currently LIVE in the service
+                    CURRENT_LIVE=$(grep "version:" kubernetes/manifest.yml | tail -n 1 | awk '{print $2}')
+                    
+                    if [ "$CURRENT_LIVE" == "blue" ]; then
+                        TARGET="green"
+                    else
+                        TARGET="blue"
+                    fi
+                    
+                    echo "Current live is $CURRENT_LIVE. Deploying to $TARGET."
 
-                    sed -i "s|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${BUILD_NUMBER}|g" kubernetes/manifest.yml
+                    # 2. Update the IMAGE for the TARGET deployment only
+                    # This uses a line-specific sed to find the ecomerce-TARGET deployment block
+                    # Note: This assumes your manifest.yml has blue first then green
+                    if [ "$TARGET" == "blue" ]; then
+                        # Update image for ecomerce-blue
+                        sed -i "/name: ecomerce-blue/,/image:/ s|image: .*|image: ${IMAGE_NAME}:${BUILD_NUMBER}|" kubernetes/manifest.yml
+                    else
+                        # Update image for ecomerce-green
+                        sed -i "/name: ecomerce-green/,/image:/ s|image: .*|image: ${IMAGE_NAME}:${BUILD_NUMBER}|" kubernetes/manifest.yml
+                    fi
+
+                    # 3. Switch the Service Selector to the new TARGET
+                    sed -i "s|version: $CURRENT_LIVE|version: $TARGET|g" kubernetes/manifest.yml
 
                     git add kubernetes/manifest.yml
-                    git commit -m "Update image tag to ${BUILD_NUMBER} [skip ci]" || echo "No changes to commit"
-
-                    git push https://$GIT_USERNAME:$GIT_PASSWORD@github.com/waseem00096/ecomerce-site.git master
+                    git commit -m "Switch traffic to $TARGET with image v${BUILD_NUMBER} [skip ci]" || echo "No changes"
+                    git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/waseem00096/ecomerce-site.git master
                 '''
             }
         }
     }
 }
-
     }
     post {
         always {
